@@ -43,7 +43,7 @@ npm run build
 
 | Member | Role |
 | --- | --- |
-| Hakuryu Acosta Kato | Full Stack Developer / AI Engineer /  |
-| Luis Fernando A. Nival | Backend Developer |
+| Hakuryu Acosta Kato | Full Stack Developer / AI Engineer / Project Lead |
+| Luis Fernando A. Nival | Backend Developer/ UI/UX Designer |
 | Zerwin Kurt D. Ventura | Quality Assurance Tester / Documentation / Researcher|
 | Mickaela Paula R. Orillosa | Quality Assurance Tester/ Documentation / Researcher  |

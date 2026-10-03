@@ -1,7 +1,6 @@
 # The Thinking Room
 
-A five-game board-game arcade: chess, tic-tac-toe, checkers, Connect Four, and Gomoku. The opponent can use a local Ollama model coordinated as a small multi-agent team, or the built-in game AI when Ollama is unavailable.
-
+A six-game board-game arcade: chess, tic-tac-toe, checkers, Connect Four,BlackJack, and Gomoku. The opponent can use a local Ollama model coordinated as a small multi-agent team.
 ## Run the app
 
 
@@ -44,6 +43,6 @@ npm run build
 | Member | Role |
 | --- | --- |
 | Hakuryu Acosta Kato | Full Stack Developer / AI Engineer / Project Lead |
-| Luis Fernando A. Nival | Backend Developer/ UI/UX Designer |
+| Luis Fernando A. Nival | Backend Developer/ Debugging Engineer |
 | Zerwin Kurt D. Ventura | Quality Assurance Tester / Documentation / Researcher|
 | Mickaela Paula R. Orillosa | Quality Assurance Tester/ Documentation / Researcher  |

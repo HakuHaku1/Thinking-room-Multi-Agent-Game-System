@@ -1,6 +1,3 @@
-Here's the full README with the Team section added and the stray "readme file" line removed. Everything else is unchanged.
-
-````markdown
 # The Thinking Room
 
 A five-game board-game arcade: chess, tic-tac-toe, checkers, Connect Four, and Gomoku. The opponent can use a local Ollama model coordinated as a small multi-agent team, or the built-in game AI when Ollama is unavailable.
@@ -23,9 +20,9 @@ Open http://localhost:3000.
 1. Install and start Ollama for Windows.
 2. In a terminal, download the default model:
 
-   ```powershell
+```powershell
    ollama pull llama3.2:3b
-   ```
+```
 
 3. Keep the Ollama service running, then refresh the app. It checks the local service at `http://localhost:11434` and shows whether the configured model is available.
 
@@ -51,5 +48,3 @@ npm run build
 | Luis Nival | Backend Developer |
 | Mikaela Orillasa | Quality Assurance Tester |
 | Zerwin Venture | Quality Assurance Tester |
-````
-

@@ -1,27 +1,9 @@
 import { NextResponse } from "next/server";
-import { askOllama, type OllamaSchema } from "@/lib/ollama";
+import { getAgentFactory } from "@/lib/agent-factory";
+import { COACH_AGENT_CONFIG, type CoachReview } from "@/lib/agent-configs";
 
 const supportedGames = new Set(["chess", "tictactoe", "checkers", "connect4", "gomoku"]);
 const outcomes = new Set(["player", "opponent", "draw"]);
-
-type CoachReview = {
-  summary: string;
-  strength: string;
-  improve: string;
-  nextTip: string;
-};
-
-const reviewSchema: OllamaSchema = {
-  type: "object",
-  properties: {
-    summary: { type: "string" },
-    strength: { type: "string" },
-    improve: { type: "string" },
-    nextTip: { type: "string" },
-  },
-  required: ["summary", "strength", "improve", "nextTip"],
-  additionalProperties: false,
-};
 
 export async function POST(request: Request) {
   let payload: { game?: unknown; outcome?: unknown; history?: unknown; finalBoard?: unknown; score?: unknown };
@@ -47,10 +29,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const review = await askOllama<CoachReview>(
-      "You are the Coach agent in a multi-agent game team. Review the player's game using only the supplied move log and final board. Be encouraging but honest and specific to this game's rules. Identify one actual strength, one useful improvement, and one actionable next-game tip. Never invent moves absent from the log. Do not reveal private chain-of-thought. Return only the required JSON response.",
-      `Game: ${game}\nResult: ${outcome}\nSession record: ${JSON.stringify(score)}\nMove log:\n${(history as string[]).join("\n")}\nFinal board: ${boardState}\nGive concise feedback in four fields.`,
-      reviewSchema,
+    const factory = getAgentFactory();
+    const coach = factory.createFromConfig<CoachReview>(COACH_AGENT_CONFIG);
+    
+    const review = await coach.execute(
+      `Game: ${game}\nResult: ${outcome}\nSession record: ${JSON.stringify(score)}\nMove log:\n${(history as string[]).join("\n")}\nFinal board: ${boardState}\nGive concise feedback in four fields.`
     );
 
     const fields = [review.summary, review.strength, review.improve, review.nextTip];

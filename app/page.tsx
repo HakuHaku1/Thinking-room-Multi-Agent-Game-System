@@ -30,21 +30,28 @@ import {
   chooseConnectFourMove,
   chooseGomokuMove,
   chooseTicTacToeMove,
+  createBlackjackGame,
   createCheckersBoard,
   createConnectFourBoard,
   createGomokuBoard,
   createTicTacToeBoard,
+  getBlackjackWinner,
   getCheckersLegalMoves,
   getConnectFourWinner,
   getGomokuWinner,
+  getHandValue,
   getTicTacToeWinner,
+  hitPlayer,
+  standPlayer,
+  type BlackjackPlayer,
+  type Card,
   type CheckersBoard,
   type CheckersMove,
   type ConnectFourBoard,
   type Mark,
 } from "@/lib/games";
 
-type GameId = "chess" | "tictactoe" | "checkers" | "connect4" | "gomoku";
+type GameId = "chess" | "tictactoe" | "checkers" | "connect4" | "gomoku" | "blackjack";
 type Result = "player" | "opponent" | "draw" | null;
 type OpponentMode = "local" | "ollama";
 type ChatMessage = { role: "user" | "assistant" | "system" | "coach"; content: string };
@@ -55,6 +62,7 @@ const games: { id: GameId; name: string; detail: string; icon: LucideIcon; numbe
   { id: "checkers", name: "Checkers", detail: "Take the middle", icon: Blocks, number: "03" },
   { id: "connect4", name: "Connect four", detail: "Four, before four", icon: CircleDot, number: "04" },
   { id: "gomoku", name: "Gomoku", detail: "Five in a line", icon: Target, number: "05" },
+  { id: "blackjack", name: "Blackjack", detail: "Beat the dealer", icon: Swords, number: "06" },
 ];
 
 const pieceGlyphs: Record<string, string> = {
@@ -103,6 +111,13 @@ export default function Home() {
   const [checkersForcedFrom, setCheckersForcedFrom] = useState<number | null>(null);
   const [connectBoard, setConnectBoard] = useState<ConnectFourBoard>(createConnectFourBoard);
   const [gomokuBoard, setGomokuBoard] = useState<Mark[]>(createGomokuBoard);
+  const [blackjackDeck, setBlackjackDeck] = useState<Card[]>([]);
+  const [blackjackPlayers, setBlackjackPlayers] = useState<BlackjackPlayer[]>([]);
+  const [blackjackCurrentIndex, setBlackjackCurrentIndex] = useState(0);
+  const [blackjackGameEnded, setBlackjackGameEnded] = useState(false);
+  const [blackjackWinner, setBlackjackWinner] = useState<string | null>(null);
+  const [dealtCard, setDealtCard] = useState<Card | null>(null);
+  const [showDealAnimation, setShowDealAnimation] = useState(false);
   const [busy, setBusy] = useState(false);
   const [opponentMode, setOpponentMode] = useState<OpponentMode>("local");
   const [ollamaReady, setOllamaReady] = useState(false);
@@ -146,6 +161,13 @@ export default function Home() {
         setOpponentMode("local");
       });
   }, []);
+
+  // Auto-start blackjack when game is selected
+  useEffect(() => {
+    if (activeGame === "blackjack" && blackjackPlayers.length === 0) {
+      void startBlackjackGame();
+    }
+  }, [activeGame]);
 
   useEffect(() => {
     if (!result || coachRequestedForSession.current === session.current) return;
@@ -244,6 +266,13 @@ export default function Home() {
     setCheckersForcedFrom(null);
     setConnectBoard(createConnectFourBoard());
     setGomokuBoard(createGomokuBoard());
+    setBlackjackDeck([]);
+    setBlackjackPlayers([]);
+    setBlackjackCurrentIndex(0);
+    setBlackjackGameEnded(false);
+    setBlackjackWinner(null);
+    setDealtCard(null);
+    setShowDealAnimation(false);
     setBusy(false);
     setOpponentCommentary("");
     setChatMessages([]);
@@ -564,13 +593,109 @@ export default function Home() {
     });
   }
 
+  async function startBlackjackGame() {
+    setBusy(true);
+    try {
+      const response = await fetch("/api/blackjack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "new" }),
+      });
+      
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to start blackjack game");
+      }
+      
+      const data = await response.json() as { deck?: Card[]; players?: BlackjackPlayer[] };
+      if (!data.deck || !data.players) {
+        throw new Error("Invalid response from server");
+      }
+      
+      setBlackjackDeck(data.deck);
+      setBlackjackPlayers(data.players);
+      setBlackjackCurrentIndex(0);
+      setBlackjackGameEnded(false);
+      setBlackjackWinner(null);
+      setDealtCard(null);
+      setShowDealAnimation(false);
+      setBusy(false);
+    } catch (error) {
+      appendSystemMessage(error instanceof Error ? error.message : "Failed to start blackjack game");
+      setBusy(false);
+    }
+  }
+
+  async function playBlackjackAction(action: "hit" | "stand") {
+    if (busy || blackjackGameEnded) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/blackjack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          deck: blackjackDeck,
+          players: blackjackPlayers,
+          currentPlayerIndex: blackjackCurrentIndex,
+        }),
+      });
+      
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to play blackjack action");
+      }
+      
+      const data = await response.json() as {
+        deck?: Card[];
+        players?: BlackjackPlayer[];
+        currentPlayerIndex?: number;
+        gameEnded?: boolean;
+        aiReasoning?: string;
+      };
+      
+      if (data.deck && data.players && data.currentPlayerIndex !== undefined) {
+        setBlackjackDeck(data.deck);
+        setBlackjackPlayers(data.players);
+        setBlackjackCurrentIndex(data.currentPlayerIndex);
+        
+        // Only reset animation if turn moved to AI (player still can hit)
+        if (data.players[data.currentPlayerIndex]?.id !== "player") {
+          setShowDealAnimation(false);
+          setDealtCard(null);
+        }
+        
+        if (data.gameEnded) {
+          setBlackjackGameEnded(true);
+          const winner = getBlackjackWinner(data.players);
+          setBlackjackWinner(winner.result);
+          if (winner.winner?.id === "player") {
+            finish("player");
+          } else if (winner.winner?.id !== "player") {
+            finish("opponent");
+          }
+        }
+        if (data.aiReasoning) {
+          appendAgentMessage(data.aiReasoning);
+        }
+      } else {
+        throw new Error("Invalid response from server");
+      }
+    } catch (error) {
+      appendSystemMessage(error instanceof Error ? error.message : "Failed to play blackjack action");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const turnLabel = result === "player" ? "You took the match"
     : result === "opponent" ? "Ollama team wins this one"
       : result === "draw" ? "A clean draw"
         : busy ? "Ollama agents are working"
           : activeGame === "chess" ? (chess.turn() === "w" ? "Your move" : "Ollama team to move")
             : activeGame === "checkers" ? (checkersTurn === "r" ? "Your move" : "Ollama team to move")
-              : "Your move";
+              : activeGame === "blackjack" ? (blackjackGameEnded ? blackjackWinner : blackjackPlayers[blackjackCurrentIndex]?.name + "'s turn")
+                : "Your move";
 
   return (
     <div className="app-shell">
@@ -669,6 +794,80 @@ export default function Home() {
               {activeGame === "connect4" && <div className="connect-board" role="grid" aria-label="Connect four board">{connectBoard.flatMap((row, rowIndex) => row.map((mark, colIndex) => <button key={`${rowIndex}-${colIndex}`} className={`connect-cell ${mark ? `mark-${mark.toLowerCase()}` : ""}`} aria-label={`Row ${rowIndex + 1}, column ${colIndex + 1}${mark ? ` ${mark}` : " empty"}`} disabled={busy || gameOver || Boolean(connectBoard[0][colIndex])} onClick={() => playConnectFour(colIndex)}>{mark && <span />}</button>))}</div>}
 
               {activeGame === "gomoku" && <div className="gomoku-board" role="grid" aria-label="Gomoku board">{gomokuBoard.map((mark, index) => <button key={index} className={`gomoku-point ${mark ? `mark-${mark.toLowerCase()}` : ""}`} aria-label={`Intersection ${Math.floor(index / 15) + 1}, ${index % 15 + 1}${mark ? ` ${mark}` : " empty"}`} disabled={busy || gameOver || Boolean(mark)} onClick={() => playGomoku(index)}>{mark && <span />}</button>)}</div>}
+
+              {activeGame === "blackjack" && (
+                <div className="blackjack-table">
+                  {blackjackPlayers.length === 0 ? (
+                    <div className="blackjack-start">
+                      <LoaderCircle size={24} className="spin" />
+                    </div>
+                  ) : (
+                    <div className="blackjack-game">
+                      <div className="dealer-section">
+                        <span className="dealer-label">DEALER</span>
+                        <div className={`dealer-card ${showDealAnimation ? "dealing" : ""}`}>
+                          {dealtCard && showDealAnimation ? (
+                            <div className="playing-card dealt-card-face">
+                              <span className="card-rank">{dealtCard.rank}</span>
+                              <span className={`card-suit ${dealtCard.suit === "hearts" || dealtCard.suit === "diamonds" ? "red" : "black"}`}>
+                                {dealtCard.suit === "hearts" ? "♥" : dealtCard.suit === "diamonds" ? "♦" : dealtCard.suit === "clubs" ? "♣" : "♠"}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="playing-card card-back" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="blackjack-players">
+                        {blackjackPlayers.map((player, index) => (
+                          <div key={player.id} className={`blackjack-player ${index === blackjackCurrentIndex ? "current-turn" : ""} ${player.busted ? "busted" : ""} ${player.stood ? "stood" : ""}`}>
+                            <div className="player-header">
+                              <span className="player-name">{player.name}</span>
+                              <span className="player-value">{getHandValue(player.hand)}</span>
+                            </div>
+                            <div className="player-cards">
+                              {player.hand.map((card, cardIndex) => (
+                                <div key={cardIndex} className="playing-card">
+                                  <span className="card-rank">{card.rank}</span>
+                                  <span className={`card-suit ${card.suit === "hearts" || card.suit === "diamonds" ? "red" : "black"}`}>
+                                    {card.suit === "hearts" ? "♥" : card.suit === "diamonds" ? "♦" : card.suit === "clubs" ? "♣" : "♠"}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            {player.busted && <span className="status-label busted-label">BUSTED</span>}
+                            {player.stood && <span className="status-label stood-label">STOOD</span>}
+                            {index === blackjackCurrentIndex && !blackjackGameEnded && <span className="status-label current-label">PLAYING</span>}
+                          </div>
+                        ))}
+                      </div>
+                      {blackjackGameEnded && (
+                        <div className="blackjack-result">
+                          <span className="result-text">{blackjackWinner}</span>
+                          <button className="primary-button" onClick={() => startBlackjackGame()}>New Game</button>
+                        </div>
+                      )}
+                      {!blackjackGameEnded && blackjackPlayers[blackjackCurrentIndex]?.id === "player" && (
+                        <div className="blackjack-actions">
+                          <button className="action-button hit-button" onClick={() => {
+                            const nextCard = blackjackDeck.length > 0 ? blackjackDeck[blackjackDeck.length - 1] : null;
+                            setDealtCard(nextCard);
+                            setShowDealAnimation(true);
+                            setTimeout(() => {
+                              void playBlackjackAction("hit");
+                            }, 600);
+                          }} disabled={busy}>
+                            Hit
+                          </button>
+                          <button className="action-button stand-button" onClick={() => playBlackjackAction("stand")} disabled={busy}>
+                            Stand
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="player-bar player-bottom">
                 <div className="player-info"><span className="avatar user-avatar"><UserRound size={17} /></span><span className="player-name">You<span className="player-label">PLAYER 01</span></span></div>

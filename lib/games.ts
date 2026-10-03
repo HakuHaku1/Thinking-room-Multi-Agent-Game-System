@@ -350,3 +350,124 @@ export function chooseChessMove(fen: string): string | null {
   }
   return bestMove;
 }
+
+// Blackjack game logic
+export type Suit = "hearts" | "diamonds" | "clubs" | "spades";
+export type Rank = "A" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K";
+export type Card = { suit: Suit; rank: Rank };
+export type BlackjackHand = Card[];
+export type BlackjackPlayer = { id: string; name: string; hand: BlackjackHand; busted: boolean; stood: boolean };
+
+const SUITS: Suit[] = ["hearts", "diamonds", "clubs", "spades"];
+const RANKS: Rank[] = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+
+export function createDeck(): Card[] {
+  const deck: Card[] = [];
+  for (const suit of SUITS) {
+    for (const rank of RANKS) {
+      deck.push({ suit, rank });
+    }
+  }
+  // Fisher-Yates shuffle
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+export function getCardValue(card: Card): number {
+  if (card.rank === "A") return 11;
+  if (["K", "Q", "J"].includes(card.rank)) return 10;
+  return parseInt(card.rank);
+}
+
+export function getHandValue(hand: BlackjackHand): number {
+  let value = hand.reduce((sum, card) => sum + getCardValue(card), 0);
+  let aces = hand.filter((card) => card.rank === "A").length;
+  while (value > 21 && aces > 0) {
+    value -= 10;
+    aces--;
+  }
+  return value;
+}
+
+export function dealCard(deck: Card[]): { card: Card; remainingDeck: Card[] } {
+  const card = deck.pop();
+  if (!card) throw new Error("Deck is empty");
+  return { card, remainingDeck: deck };
+}
+
+export function createBlackjackGame(): {
+  deck: Card[];
+  players: BlackjackPlayer[];
+} {
+  let deck = createDeck();
+  const players: BlackjackPlayer[] = [
+    { id: "player", name: "You", hand: [], busted: false, stood: false },
+    { id: "ai1", name: "Aggressive AI", hand: [], busted: false, stood: false },
+    { id: "ai2", name: "Conservative AI", hand: [], busted: false, stood: false },
+    { id: "ai3", name: "Strategic AI", hand: [], busted: false, stood: false },
+  ];
+
+  // Deal initial cards (2 each)
+  for (let i = 0; i < 2; i++) {
+    for (const player of players) {
+      const { card, remainingDeck } = dealCard(deck);
+      player.hand.push(card);
+      deck = remainingDeck;
+    }
+  }
+
+  return { deck, players };
+}
+
+export function hitPlayer(deck: Card[], player: BlackjackPlayer): {
+  updatedDeck: Card[];
+  updatedPlayer: BlackjackPlayer;
+} {
+  const { card, remainingDeck } = dealCard(deck);
+  const updatedPlayer = {
+    ...player,
+    hand: [...player.hand, card],
+    busted: getHandValue([...player.hand, card]) > 21,
+  };
+  return { updatedDeck: remainingDeck, updatedPlayer };
+}
+
+export function standPlayer(player: BlackjackPlayer): BlackjackPlayer {
+  return { ...player, stood: true };
+}
+
+export function getBlackjackWinner(players: BlackjackPlayer[]): {
+  winner: BlackjackPlayer | null;
+  result: string;
+} {
+  const activePlayers = players.filter((p) => !p.busted);
+  if (activePlayers.length === 0) {
+    return { winner: null, result: "All players busted" };
+  }
+
+  const bestPlayer = activePlayers.reduce((best, current) => {
+    const bestValue = getHandValue(best.hand);
+    const currentValue = getHandValue(current.hand);
+    return currentValue > bestValue ? current : best;
+  });
+
+  const bestValue = getHandValue(bestPlayer.hand);
+  const hasBlackjack = bestValue === 21 && bestPlayer.hand.length === 2;
+
+  return {
+    winner: bestPlayer,
+    result: hasBlackjack ? `${bestPlayer.name} wins with Blackjack!` : `${bestPlayer.name} wins with ${bestValue}`,
+  };
+}
+
+export function getBlackjackLegalActions(hand: BlackjackHand): string[] {
+  const value = getHandValue(hand);
+  const actions: string[] = ["stand"];
+  if (value < 21) {
+    actions.push("hit");
+  }
+  return actions;
+}

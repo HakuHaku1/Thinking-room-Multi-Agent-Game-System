@@ -1,3 +1,6 @@
+Here's the full README with the Team section added and the stray "readme file" line removed. Everything else is unchanged.
+
+````markdown
 # The Thinking Room
 
 A five-game board-game arcade: chess, tic-tac-toe, checkers, Connect Four, and Gomoku. The opponent can use a local Ollama model coordinated as a small multi-agent team, or the built-in game AI when Ollama is unavailable.
@@ -39,3 +42,14 @@ npm run lint
 npx tsc --noEmit
 npm run build
 ```
+
+## Team
+
+| Member | Role |
+| --- | --- |
+| Hakuryu Acosta Kato | Full Stack Developer / AI Engineer |
+| Luis Nival | Backend Developer |
+| Mikaela Orillasa | Quality Assurance Tester |
+| Zerwin Venture | Quality Assurance Tester |
+````
+

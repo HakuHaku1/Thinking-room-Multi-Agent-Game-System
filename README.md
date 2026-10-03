@@ -4,7 +4,6 @@ A five-game board-game arcade: chess, tic-tac-toe, checkers, Connect Four, and G
 
 ## Run the app
 
-On Windows, double-click `start.bat` for guided first-time setup, or follow [CLASSMATE_SETUP.md](CLASSMATE_SETUP.md).
 
 To start manually:
 
